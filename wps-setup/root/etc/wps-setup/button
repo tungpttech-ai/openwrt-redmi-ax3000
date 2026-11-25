@@ -1,0 +1,64 @@
+#!/bin/sh
+
+umask 077
+iface=wpssetup0
+state=/tmp/wps-setup
+exec 9>"$state.lock"
+flock -x 9 || exit 1
+
+stop_setup() {
+	ubus -S call hostapd config_remove '{"iface":"wpssetup0"}' >/dev/null 2>&1
+	iw dev "$iface" del 2>/dev/null
+	rm -f "$state.active" "$state.presses" "$state.hostapd"
+}
+
+case "$1" in
+	expire)
+		[ -n "$2" ] && [ "$(cat "$state.active" 2>/dev/null)" = "$2" ] && stop_setup
+		exit 0
+		;;
+	tap) ;;
+	*) exit 1 ;;
+esac
+
+read -r uptime _ < /proc/uptime
+now=${uptime%.*}${uptime#*.}
+first=$now
+count=0
+if [ -s "$state.presses" ]; then
+	read -r first count < "$state.presses"
+	if [ "$((now - first))" -gt 400 ]; then
+		first=$now
+		count=0
+	fi
+fi
+count=$((count + 1))
+if [ "$count" -lt 3 ]; then
+	printf '%s %s\n' "$first" "$count" > "$state.presses"
+	exit 0
+fi
+rm -f "$state.presses"
+
+if [ -s "$state.active" ] && iw dev "$iface" info >/dev/null 2>&1; then
+	exit 0
+fi
+stop_setup
+
+phy="$(iw phy | awk '/^Wiphy / { phy=$2 } /2412 MHz/ { print phy; exit }')"
+channel="$(iw dev | awk -v phy="${phy#phy}" '/^phy#/ { active=($0=="phy#" phy) } active && $1=="channel" { print $2; exit }')"
+if ! ip link show br-wpssetup >/dev/null 2>&1 || [ -z "$phy" ] ||
+	! sed "s/^channel=.*/channel=${channel:-1}/" /etc/wps-setup/hostapd.conf > "$state.hostapd" ||
+	! iw phy "$phy" interface add "$iface" type __ap ||
+	! ubus -S call hostapd config_add '{"iface":"wpssetup0","config":"/tmp/wps-setup.hostapd"}' >/dev/null; then
+	stop_setup
+	logger -t wps-setup 'Could not start setup access point'
+	exit 1
+fi
+
+printf '%s\n' "$now" > "$state.active"
+(
+	exec 9>&-
+	sleep 600
+	/etc/wps-setup/button expire "$now"
+) </dev/null >/dev/null 2>&1 &
+logger -t wps-setup 'Setup access point requested for 10 minutes'

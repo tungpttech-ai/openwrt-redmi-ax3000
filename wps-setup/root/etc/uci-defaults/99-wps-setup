@@ -1,0 +1,38 @@
+#!/bin/sh
+
+uci -q batch <<'EOF'
+set network.wps_setup_bridge=device
+set network.wps_setup_bridge.name=br-wpssetup
+set network.wps_setup_bridge.type=bridge
+set network.wps_setup_bridge.bridge_empty=1
+set network.wps_setup=interface
+set network.wps_setup.proto=static
+set network.wps_setup.device=br-wpssetup
+set network.wps_setup.ipaddr=192.168.77.1
+set network.wps_setup.netmask=255.255.255.0
+set dhcp.wps_setup=dhcp
+set dhcp.wps_setup.interface=wps_setup
+set dhcp.wps_setup.start=100
+set dhcp.wps_setup.limit=50
+set dhcp.wps_setup.leasetime=15m
+set firewall.wps_setup=zone
+set firewall.wps_setup.name=wps_setup
+set firewall.wps_setup.input=REJECT
+set firewall.wps_setup.output=ACCEPT
+set firewall.wps_setup.forward=REJECT
+set firewall.wps_setup.network=wps_setup
+set firewall.wps_setup_dhcp=rule
+set firewall.wps_setup_dhcp.name=Allow-Setup-DHCP
+set firewall.wps_setup_dhcp.src=wps_setup
+set firewall.wps_setup_dhcp.proto=udp
+set firewall.wps_setup_dhcp.dest_port=67
+set firewall.wps_setup_dhcp.family=ipv4
+set firewall.wps_setup_dhcp.target=ACCEPT
+set firewall.wps_setup_luci=rule
+set firewall.wps_setup_luci.name=Allow-Setup-LuCI
+set firewall.wps_setup_luci.src=wps_setup
+set firewall.wps_setup_luci.proto=tcp
+set firewall.wps_setup_luci.dest_port='80 443'
+set firewall.wps_setup_luci.family=ipv4
+set firewall.wps_setup_luci.target=ACCEPT
+EOF
