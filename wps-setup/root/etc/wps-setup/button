@@ -3,13 +3,17 @@
 umask 077
 iface=wpssetup0
 state=/tmp/wps-setup
+config="$state.hostapd"
+if [ -d /etc/rc.wps ]; then
+	config=/var/run/hostapd/wpssetup.conf
+fi
 exec 9>"$state.lock"
 flock -x 9 || exit 1
 
 stop_setup() {
 	ubus -S call hostapd config_remove '{"iface":"wpssetup0"}' >/dev/null 2>&1
 	iw dev "$iface" del 2>/dev/null
-	rm -f "$state.active" "$state.presses" "$state.hostapd"
+	rm -f "$state.active" "$state.presses" "$config"
 }
 
 case "$1" in
@@ -44,12 +48,17 @@ if [ -s "$state.active" ] && iw dev "$iface" info >/dev/null 2>&1; then
 fi
 stop_setup
 
-phy="$(iw phy | awk '/^Wiphy / { phy=$2 } /2412 MHz/ { print phy; exit }')"
+phy="$(iw phy | awk '/^Wiphy / { phy=$2 } /2412(\.0)? MHz/ { print phy; exit }')"
 channel="$(iw dev | awk -v phy="${phy#phy}" '/^phy#/ { active=($0=="phy#" phy) } active && $1=="channel" { print $2; exit }')"
+hostapd_iface=$iface
+if [ "$config" != "$state.hostapd" ]; then
+	hostapd_iface=$phy
+fi
 if ! ip link show br-wpssetup >/dev/null 2>&1 || [ -z "$phy" ] ||
-	! sed "s/^channel=.*/channel=${channel:-1}/" /etc/wps-setup/hostapd.conf > "$state.hostapd" ||
+	! sed "s/^channel=.*/channel=${channel:-1}/" /etc/wps-setup/hostapd.conf > "$config" ||
+	{ [ "$config" != "$state.hostapd" ] && ! chown network:network "$config"; } ||
 	! iw phy "$phy" interface add "$iface" type __ap ||
-	! ubus -S call hostapd config_add '{"iface":"wpssetup0","config":"/tmp/wps-setup.hostapd"}' >/dev/null; then
+	! ubus -S call hostapd config_add "{\"iface\":\"$hostapd_iface\",\"config\":\"$config\"}" >/dev/null; then
 	stop_setup
 	logger -t wps-setup 'Could not start setup access point'
 	exit 1

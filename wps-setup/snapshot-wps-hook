@@ -1,0 +1,4 @@
+#!/bin/sh
+
+[ "$ACTION" = released ] || exit 0
+exec /etc/wps-setup/button tap

@@ -12,6 +12,7 @@ set network.wps_setup.ipaddr=192.168.77.1
 set network.wps_setup.netmask=255.255.255.0
 set dhcp.wps_setup=dhcp
 set dhcp.wps_setup.interface=wps_setup
+set dhcp.wps_setup.dhcpv4=server
 set dhcp.wps_setup.start=100
 set dhcp.wps_setup.limit=50
 set dhcp.wps_setup.leasetime=15m

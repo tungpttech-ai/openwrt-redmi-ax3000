@@ -11,3 +11,13 @@ bash wps-setup/build.sh /path/to/imagebuilder /path/to/stock-factory.ubi /path/t
 Choose the `redmi_ax3000` factory UBI for Redmi AX3000 or Xiaomi CR880x boards and the `cmcc_rax3000q` factory UBI for a CMCC RAX3000Q. The build identifies the stock image by its SHA-256 and reuses its kernel and packages. Check the physical model and board revision before installing a build. The two profiles report the same WPS GPIO under different button names. The CMCC profile uses short releases of the GPIO mapped to `reset` and retains its long-hold factory reset. The Redmi profile uses the WPS event and retains the original reset handler.
 
 The build prompts for a WPA2 password. Set `WPS_SETUP_PASSWORD_FILE` to a private file containing a single password for a noninteractive build. The resulting firmware contains that password and should be handled accordingly.
+
+## CR8806 snapshot
+
+The [ipq50xx-2026.11.24 release](https://github.com/kuncy7/openwrt-nss-edma/releases/tag/ipq50xx-2026.11.24) supplies the 256 MB CR8806 profile with kernel 6.18.64. Build on x86-64 Linux with `qemu-aarch64`, `mksquashfs`, `unsquashfs`, and `ubinize`.
+
+```sh
+bash wps-setup/build-snapshot.sh /path/to/cr8806-sysupgrade.bin /path/to/cr8806-setup-factory.ubi
+```
+
+The script verifies the release image, installs a pinned LuCI version from signed package feeds, and adds the setup hook to `/etc/rc.wps/`. The output is a factory UBI for the CR8806 firmware partition. Package feeds must still serve the pinned LuCI version to rebuild it.
